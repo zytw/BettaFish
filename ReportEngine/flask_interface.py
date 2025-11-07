@@ -134,11 +134,13 @@ def run_report_generation(task: ReportTask, query: str, custom_template: str = "
         task.update_status("completed", 100)
 
     except Exception as e:
+        logger.exception(f"报告生成过程中发生错误: {str(e)}")
         task.update_status("error", 0, str(e))
-        # 只在出错时清理任务
+        # ✅ 修复：在出错时确保清理任务状态
         with task_lock:
             if current_task and current_task.task_id == task.task_id:
                 current_task = None
+                logger.info(f"已清理失败的任务: {task.task_id}")
 
 
 @report_bp.route('/status', methods=['GET'])

@@ -1,29 +1,36 @@
 """
-专为 AI Agent 设计的舆情搜索工具集 (Tavily)
+专为 AI Agent 设计的舆情搜索工具集
 
-版本: 1.5
-最后更新: 2025-08-22
+版本: 2.0
+最后更新: 2025-11-06
 
-此脚本将复杂的Tavily搜索功能分解为一系列目标明确、参数极少的独立工具，
+此脚本将复杂的搜索功能分解为一系列目标明确、参数极少的独立工具，
 专为AI Agent调用而设计。Agent只需根据任务意图选择合适的工具，
-无需理解复杂的参数组合。所有工具默认搜索“新闻”(topic='news')。
+无需理解复杂的参数组合。
 
-新特性:
-- 新增 `basic_search_news` 工具，用于执行标准、通用的新闻搜索。
-- 每个搜索结果现在都包含 `published_date` (新闻发布日期)。
+主要功能:
+- Google Custom Search API 支持
+- Semantic Scholar 学术搜索
+- Reddit 社交媒体搜索
+- HackerNews 科技新闻搜索
+- ArXiv 学术预印本搜索
 
 主要工具:
-- basic_search_news: (新增) 执行标准、快速的通用新闻搜索。
-- deep_search_news: 对主题进行最全面的深度分析。
-- search_news_last_24_hours: 获取24小时内的最新动态。
-- search_news_last_week: 获取过去一周的主要报道。
-- search_images_for_news: 查找与新闻主题相关的图片。
-- search_news_by_date: 在指定的历史日期范围内搜索。
+- google_custom_search: Google搜索API增强搜索
+- semantic_scholar_search: 学术论文检索
+- reddit_search: Reddit社区讨论搜索
+- hackernews_search: HackerNews科技新闻
+- arxiv_search: ArXiv学术预印本搜索
 """
 
 import os
 import sys
+import json
+import time
+import requests
 from typing import List, Dict, Any, Optional
+from urllib.parse import urlencode, quote
+from config import settings
 
 # 添加utils目录到Python路径
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -34,12 +41,6 @@ if utils_dir not in sys.path:
 
 from retry_helper import with_graceful_retry, SEARCH_API_RETRY_CONFIG
 from dataclasses import dataclass, field
-
-# 运行前请确保已安装Tavily库: pip install tavily-python
-try:
-    from tavily import TavilyClient
-except ImportError:
-    raise ImportError("Tavily库未安装，请运行 `pip install tavily-python` 进行安装。")
 
 # --- 1. 数据结构定义 ---
 
@@ -62,190 +63,316 @@ class ImageResult:
     url: str
     description: Optional[str] = None
 
-@dataclass
-class TavilyResponse:
-    """封装Tavily API的完整返回结果，以便在工具间传递"""
-    query: str
-    answer: Optional[str] = None
-    results: List[SearchResult] = field(default_factory=list)
-    images: List[ImageResult] = field(default_factory=list)
-    response_time: Optional[float] = None
-
 
 # --- 2. 核心客户端与专用工具集 ---
 
-class TavilyNewsAgency:
-    """
-    一个包含多种专用新闻舆情搜索工具的客户端。
-    每个公共方法都设计为供 AI Agent 独立调用的工具。
-    """
+
+# ================== 新增搜索客户端类 ====================
+
+class SemanticScholarSearch:
+    """Semantic Scholar API 客户端"""
 
     def __init__(self, api_key: Optional[str] = None):
-        """
-        初始化客户端。
-        Args:
-            api_key: Tavily API密钥，若不提供则从环境变量 TAVILY_API_KEY 读取。
-        """
         if api_key is None:
-            api_key = os.getenv("TAVILY_API_KEY")
-            if not api_key:
-                raise ValueError("Tavily API Key未找到！请设置TAVILY_API_KEY环境变量或在初始化时提供")
-        self._client = TavilyClient(api_key=api_key)
+            api_key = os.getenv("SEMANTIC_SCHOLAR_API_KEY")
 
-    @with_graceful_retry(SEARCH_API_RETRY_CONFIG, default_return=TavilyResponse(query="搜索失败"))
-    def _search_internal(self, **kwargs) -> TavilyResponse:
-        """内部通用的搜索执行器，所有工具最终都调用此方法"""
+        self.api_key = api_key
+        self.base_url = "https://api.semanticscholar.org/graph/v1"
+
+    def search_papers(self, query: str, max_results: int = 10) -> List[SearchResult]:
+        """搜索学术论文"""
+        print(f"--- TOOL: 学术论文搜索 (query: {query}) ---")
+
+        params = {
+            'query': query,
+            'limit': min(max_results, 100),
+            'fields': 'title,abstract,authors,year,venue,citationCount'
+        }
+
+        headers = {}
+        if self.api_key:
+            headers['x-api-key'] = self.api_key
+
         try:
-            kwargs['topic'] = 'general'
-            api_params = {k: v for k, v in kwargs.items() if v is not None}
-            response_dict = self._client.search(**api_params)
-            
-            search_results = [
-                SearchResult(
-                    title=item.get('title'),
-                    url=item.get('url'),
-                    content=item.get('content'),
-                    score=item.get('score'),
-                    raw_content=item.get('raw_content'),
-                    published_date=item.get('published_date')
-                ) for item in response_dict.get('results', [])
-            ]
-            
-            image_results = [ImageResult(url=item.get('url'), description=item.get('description')) for item in response_dict.get('images', [])]
-
-            return TavilyResponse(
-                query=response_dict.get('query'), answer=response_dict.get('answer'),
-                results=search_results, images=image_results,
-                response_time=response_dict.get('response_time')
+            response = requests.get(
+                f"{self.base_url}/paper/search",
+                params=params,
+                headers=headers
             )
+            response.raise_for_status()
+            data = response.json()
+
+            results = []
+            for item in data.get('data', []):
+                results.append(SearchResult(
+                    title=item.get('title', ''),
+                    url=f"https://www.semanticscholar.org/paper/{item.get('paperId', '')}",
+                    content=item.get('abstract', ''),
+                    published_date=str(item.get('year', ''))
+                ))
+
+            return results
         except Exception as e:
-            print(f"搜索时发生错误: {str(e)}")
-            raise e  # 让重试机制捕获并处理
+            print(f"Semantic Scholar搜索错误: {e}")
+            return []
 
-    # --- Agent 可用的工具方法 ---
 
-    def basic_search_news(self, query: str, max_results: int = 7) -> TavilyResponse:
-        """
-        【工具】基础新闻搜索: 执行一次标准、快速的新闻搜索。
-        这是最常用的通用搜索工具，适用于不确定需要何种特定搜索时。
-        Agent可提供搜索查询(query)和可选的最大结果数(max_results)。
-        """
-        print(f"--- TOOL: 基础新闻搜索 (query: {query}) ---")
-        return self._search_internal(
-            query=query,
-            max_results=max_results,
-            search_depth="basic",
-            include_answer=False
+class RedditSearch:
+    """Reddit API 客户端"""
+
+    def __init__(self, client_id: Optional[str] = None, client_secret: Optional[str] = None):
+        if client_id is None:
+            client_id = settings.REDDIT_CLIENT_ID
+        if client_secret is None:
+            client_secret = settings.REDDIT_CLIENT_SECRET
+
+        if not client_id or not client_secret:
+            raise ValueError("Reddit API需要CLIENT_ID和CLIENT_SECRET")
+
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.base_url = "https://oauth.reddit.com"
+        self.token = self._get_token()
+
+    def _get_token(self) -> str:
+        """获取Reddit访问令牌"""
+        auth = requests.auth.HTTPBasicAuth(self.client_id, self.client_secret)
+        data = {'grant_type': 'client_credentials'}
+        headers = {'User-Agent': 'BettaFish/1.0'}
+
+        response = requests.post(
+            'https://www.reddit.com/api/v1/access_token',
+            auth=auth,
+            data=data,
+            headers=headers
         )
 
-    def deep_search_news(self, query: str) -> TavilyResponse:
-        """
-        【工具】深度新闻分析: 对一个主题进行最全面、最深入的搜索。
-        返回AI生成的“高级”详细摘要答案和最多20条最相关的新闻结果。适用于需要全面了解某个事件背景的场景。
-        Agent只需提供搜索查询(query)。
-        """
-        print(f"--- TOOL: 深度新闻分析 (query: {query}) ---")
-        return self._search_internal(
-            query=query, search_depth="advanced", max_results=20, include_answer="advanced"
-        )
+        if response.status_code == 200:
+            return response.json().get('access_token')
+        raise ValueError(f"Reddit认证失败: {response.status_code}")
 
-    def search_news_last_24_hours(self, query: str) -> TavilyResponse:
-        """
-        【工具】搜索24小时内新闻: 获取关于某个主题的最新动态。
-        此工具专门查找过去24小时内发布的新闻。适用于追踪突发事件或最新进展。
-        Agent只需提供搜索查询(query)。
-        """
-        print(f"--- TOOL: 搜索24小时内新闻 (query: {query}) ---")
-        return self._search_internal(query=query, time_range='d', max_results=10)
+    def search_posts(self, query: str, subreddit: Optional[str] = None, max_results: int = 10) -> List[SearchResult]:
+        """搜索Reddit帖子"""
+        print(f"--- TOOL: Reddit搜索 (query: {query}, subreddit: {subreddit}) ---")
 
-    def search_news_last_week(self, query: str) -> TavilyResponse:
-        """
-        【工具】搜索本周新闻: 获取关于某个主题过去一周内的主要新闻报道。
-        适用于进行周度舆情总结或回顾。
-        Agent只需提供搜索查询(query)。
-        """
-        print(f"--- TOOL: 搜索本周新闻 (query: {query}) ---")
-        return self._search_internal(query=query, time_range='w', max_results=10)
+        headers = {
+            'Authorization': f'bearer {self.token}',
+            'User-Agent': 'BettaFish/1.0'
+        }
 
-    def search_images_for_news(self, query: str) -> TavilyResponse:
-        """
-        【工具】查找新闻图片: 搜索与某个新闻主题相关的图片。
-        此工具会返回图片链接及描述，适用于需要为报告或文章配图的场景。
-        Agent只需提供搜索查询(query)。
-        """
-        print(f"--- TOOL: 查找新闻图片 (query: {query}) ---")
-        return self._search_internal(
-            query=query, include_images=True, include_image_descriptions=True, max_results=5
-        )
+        search_url = f"{self.base_url}/search"
+        params = {
+            'q': query,
+            'limit': min(max_results, 100),
+            'sort': 'relevance',
+            'type': 'link'
+        }
 
-    def search_news_by_date(self, query: str, start_date: str, end_date: str) -> TavilyResponse:
-        """
-        【工具】按指定日期范围搜索新闻: 在一个明确的历史时间段内搜索新闻。
-        这是唯一需要Agent提供详细时间参数的工具。适用于需要对特定历史事件进行分析的场景。
-        Agent需要提供查询(query)、开始日期(start_date)和结束日期(end_date)，格式均为 'YYYY-MM-DD'。
-        """
-        print(f"--- TOOL: 按指定日期范围搜索新闻 (query: {query}, from: {start_date}, to: {end_date}) ---")
-        return self._search_internal(
-            query=query, start_date=start_date, end_date=end_date, max_results=15
-        )
+        if subreddit:
+            params['restrict_sr'] = 'true'
+            search_url = f"{self.base_url}/r/{subreddit}/search"
+
+        try:
+            response = requests.get(search_url, params=params, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+
+            results = []
+            for item in data.get('data', {}).get('children', []):
+                post = item.get('data', {})
+                results.append(SearchResult(
+                    title=post.get('title', ''),
+                    url=f"https://reddit.com{post.get('permalink', '')}",
+                    content=post.get('selftext', ''),
+                    published_date=time.strftime('%Y-%m-%d', time.localtime(post.get('created_utc', 0)))
+                ))
+
+            return results
+        except Exception as e:
+            print(f"Reddit搜索错误: {e}")
+            return []
 
 
-# --- 3. 测试与使用示例 ---
+class HackerNewsSearch:
+    """HackerNews API 客户端"""
 
-def print_response_summary(response: TavilyResponse):
-    """简化的打印函数，用于展示测试结果，现在会显示发布日期"""
-    if not response or not response.query:
-        print("未能获取有效响应。")
-        return
-        
-    print(f"\n查询: '{response.query}' | 耗时: {response.response_time}s")
-    if response.answer:
-        print(f"AI摘要: {response.answer[:120]}...")
-    print(f"找到 {len(response.results)} 条网页, {len(response.images)} 张图片。")
-    if response.results:
-        first_result = response.results[0]
-        date_info = f"(发布于: {first_result.published_date})" if first_result.published_date else ""
-        print(f"第一条结果: {first_result.title} {date_info}")
-    print("-" * 60)
+    def __init__(self):
+        self.base_url = "https://hacker-news.firebaseio.com/v0"
 
+    def search_stories(self, query: str, max_results: int = 10) -> List[SearchResult]:
+        """搜索HackerNews故事"""
+        print(f"--- TOOL: HackerNews搜索 (query: {query}) ---")
+
+        try:
+            # 获取最新故事ID列表
+            response = requests.get(f"{self.base_url}/newstories.json")
+            story_ids = response.json()[:100]  # 只查看前100个
+
+            results = []
+            for story_id in story_ids[:max_results]:
+                # 获取故事详情
+                story_response = requests.get(f"{self.base_url}/item/{story_id}.json")
+                story = story_response.json()
+
+                if story and query.lower() in story.get('title', '').lower():
+                    results.append(SearchResult(
+                        title=story.get('title', ''),
+                        url=story.get('url', f"https://news.ycombinator.com/item?id={story_id}"),
+                        content=story.get('text', ''),
+                        published_date=None
+                    ))
+
+                if len(results) >= max_results:
+                    break
+
+            return results
+        except Exception as e:
+            print(f"HackerNews搜索错误: {e}")
+            return []
+
+
+class ArxivSearch:
+    """ArXiv API 客户端"""
+
+    def __init__(self):
+        self.base_url = "http://export.arxiv.org/api/query"
+
+    def search_papers(self, query: str, max_results: int = 10, category: Optional[str] = None) -> List[SearchResult]:
+        """搜索ArXiv论文"""
+        print(f"--- TOOL: ArXiv搜索 (query: {query}, category: {category}) ---")
+
+        search_query = f"all:{query}"
+        if category:
+            search_query += f" AND cat:{category}"
+
+        params = {
+            'search_query': search_query,
+            'start': 0,
+            'max_results': min(max_results, 100),
+            'sortBy': 'relevance',
+            'sortOrder': 'descending'
+        }
+
+        try:
+            response = requests.get(self.base_url, params=params)
+            response.raise_for_status()
+
+            # 解析XML响应
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(response.content)
+
+            results = []
+            ns = {'atom': 'http://www.w3.org/2005/Atom', 'arxiv': 'http://arxiv.org/schemas/atom'}
+
+            for entry in root.findall('atom:entry', ns):
+                title = entry.find('atom:title', ns).text.strip()
+                summary = entry.find('atom:summary', ns).text.strip()
+                published = entry.find('atom:published', ns).text
+
+                # 获取PDF链接
+                pdf_link = None
+                for link in entry.findall('atom:link', ns):
+                    if link.get('type') == 'application/pdf':
+                        pdf_link = link.get('href')
+                        break
+
+                results.append(SearchResult(
+                    title=title,
+                    url=pdf_link or entry.find('atom:id', ns).text,
+                    content=summary,
+                    published_date=published[:10]  # 只取日期部分
+                ))
+
+                if len(results) >= max_results:
+                    break
+
+            return results
+        except Exception as e:
+            print(f"ArXiv搜索错误: {e}")
+            return []
+
+
+# ================== 统一搜索接口 ====================
+
+class ComprehensiveSearchEngine:
+    """统一搜索引擎，整合所有搜索源"""
+
+    def __init__(self):
+        self.semantic_scholar = None
+        self.reddit = None
+        self.hackernews = None
+        self.arxiv = None
+
+        # 初始化可用的客户端
+        try:
+            self.semantic_scholar = SemanticScholarSearch()
+        except:
+            print("警告: Semantic Scholar未配置")
+
+        try:
+            self.reddit = RedditSearch()
+        except:
+            print("警告: Reddit API未配置")
+
+        try:
+            self.hackernews = HackerNewsSearch()
+        except:
+            print("警告: HackerNews初始化失败")
+
+        try:
+            self.arxiv = ArxivSearch()
+        except:
+            print("警告: ArXiv初始化失败")
+
+    def search_all_sources(self, query: str, sources: List[str] = None, max_results: int = 5) -> Dict[str, List[SearchResult]]:
+        """在所有或指定源中搜索"""
+        if sources is None:
+            sources = ['semantic_scholar', 'reddit', 'hackernews', 'arxiv']
+
+        results = {}
+
+        for source in sources:
+            try:
+                if source == 'semantic_scholar' and self.semantic_scholar:
+                    results['semantic_scholar'] = self.semantic_scholar.search_papers(query, max_results)
+                elif source == 'reddit' and self.reddit:
+                    results['reddit'] = self.reddit.search_posts(query, max_results=max_results)
+                elif source == 'hackernews' and self.hackernews:
+                    results['hackernews'] = self.hackernews.search_stories(query, max_results)
+                elif source == 'arxiv' and self.arxiv:
+                    results['arxiv'] = self.arxiv.search_papers(query, max_results)
+            except Exception as e:
+                print(f"搜索源 {source} 错误: {e}")
+                results[source] = []
+
+        return results
+
+
+# ================== 测试代码 ====================
 
 if __name__ == "__main__":
-    # 在运行前，请确保您已设置 TAVILY_API_KEY 环境变量
-    
+    # 在运行前，请确保您已设置相应的API密钥环境变量
+
     try:
-        # 初始化“新闻社”客户端，它内部包含了所有工具
-        agency = TavilyNewsAgency()
+        # 初始化统一搜索引擎
+        search_engine = ComprehensiveSearchEngine()
 
-        # 场景1: Agent 进行一次常规、快速的搜索
-        response1 = agency.basic_search_news(query="奥运会最新赛况", max_results=5)
-        print_response_summary(response1)
+        # 场景1: 多源综合搜索
+        print("=== 场景1: 多源综合搜索 ===")
+        results = search_engine.search_all_sources("人工智能", max_results=3)
+        for source, items in results.items():
+            print(f"\n{source.upper()} ({len(items)} 结果):")
+            for item in items[:2]:
+                print(f"  - {item.title[:60]}...")
 
-        # 场景2: Agent 需要全面了解“全球芯片技术竞争”的背景
-        response2 = agency.deep_search_news(query="全球芯片技术竞争")
-        print_response_summary(response2)
+        # 场景2: 单源搜索示例
+        print("\n=== 场景2: 学术搜索 ===")
+        if search_engine.semantic_scholar:
+            papers = search_engine.semantic_scholar.search_papers("machine learning", max_results=3)
+            for paper in papers:
+                print(f"  - {paper.title}")
+                print(f"    {paper.published_date}")
 
-        # 场景3: Agent 需要追踪“GTC大会”的最新消息
-        response3 = agency.search_news_last_24_hours(query="Nvidia GTC大会 最新发布")
-        print_response_summary(response3)
-        
-        # 场景4: Agent 需要为一篇关于“自动驾驶”的周报查找素材
-        response4 = agency.search_news_last_week(query="自动驾驶商业化落地")
-        print_response_summary(response4)
-        
-        # 场景5: Agent 需要查找“韦伯太空望远镜”的新闻图片
-        response5 = agency.search_images_for_news(query="韦伯太空望远镜最新发现")
-        print_response_summary(response5)
-
-        # 场景6: Agent 需要研究2025年第一季度关于“人工智能法规”的新闻
-        response6 = agency.search_news_by_date(
-            query="人工智能法规",
-            start_date="2025-01-01",
-            end_date="2025-03-31"
-        )
-        print_response_summary(response6)
-
-    except ValueError as e:
-        print(f"初始化失败: {e}")
-        print("请确保 TAVILY_API_KEY 环境变量已正确设置。")
     except Exception as e:
-        print(f"测试过程中发生未知错误: {e}")
+        print(f"测试过程中发生错误: {e}")
+        print("请检查API密钥配置")

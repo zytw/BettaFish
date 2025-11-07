@@ -1214,11 +1214,16 @@
                 ]
             },
             {
-                title: '外部检索工具',
-                subtitle: '联动搜索引擎、网站抓取等在线服务',
+                title: 'API配置',
+                subtitle: '各种信息源的API配置',
                 fields: [
-                    { key: 'TAVILY_API_KEY', label: 'Tavily API Key' },
-                    { key: 'BOCHA_WEB_SEARCH_API_KEY', label: 'Bocha API Key' }
+                    { key: 'TAVILY_API_KEY', label: 'Tavily API Key', type: 'password' },
+                    { key: 'BOCHA_WEB_SEARCH_API_KEY', label: 'Bocha API Key', type: 'password' },
+                    { key: 'SEMANTIC_SCHOLAR_API_KEY', label: 'Semantic Scholar API Key', type: 'password' },
+                    { key: 'REDDIT_CLIENT_ID', label: 'Reddit客户端ID' },
+                    { key: 'REDDIT_CLIENT_SECRET', label: 'Reddit客户端密钥', type: 'password' },
+                    { key: 'YOUTUBE_API_KEY', label: 'YouTube API Key', type: 'password' },
+                    { key: 'ALPHAVANTAGE_API_KEY', label: 'Alpha Vantage API Key', type: 'password' }
                 ]
             }
         ];
@@ -2899,24 +2904,24 @@
             .then(data => {
                 if (data.success) {
                     updateProgressDisplay(data.task);
-                    
+
                     // 在检查进度时也刷新日志
                     refreshReportLog();
-                    
+
                     if (data.task.status === 'completed') {
                         clearInterval(reportPollingInterval);
                         showMessage('报告生成完成！', 'success');
-                        
+
                         // 自动显示报告
                         viewReport(taskId);
-                        
+
                         // 重置自动生成标志，允许下次有新内容时自动生成
                         autoGenerateTriggered = false;
                         reportTaskId = null;
                     } else if (data.task.status === 'error') {
                         clearInterval(reportPollingInterval);
                         showMessage('报告生成失败: ' + data.task.error_message, 'error');
-                        
+
                         // 重置自动生成标志，允许重新尝试
                         autoGenerateTriggered = false;
                         reportTaskId = null;
@@ -2925,6 +2930,11 @@
             })
             .catch(error => {
                 console.error('检查进度失败:', error);
+                // ✅ 修复：网络错误时也重置状态，防止无限循环
+                clearInterval(reportPollingInterval);
+                showMessage('报告检查失败，已重置状态', 'error');
+                autoGenerateTriggered = false;
+                reportTaskId = null;
             });
         }
 

@@ -33,7 +33,10 @@ class Settings(BaseSettings):
     DB_PASSWORD: str = Field("your_db_password", description="数据库密码")
     DB_NAME: str = Field("your_db_name", description="数据库名称")
     DB_CHARSET: str = Field("utf8mb4", description="数据库字符集，推荐utf8mb4，兼容emoji")
-    
+
+    # ======================= 文件输出配置 ======================
+    OUTPUT_DIR: str = Field("/app/reports", description="报告和输出文件的保存目录")
+
     # ======================= LLM 相关 =======================
     # Insight Agent（推荐Kimi，申请地址：https://platform.moonshot.cn/）
     INSIGHT_ENGINE_API_KEY: Optional[str] = Field(None, description="Insight Agent（推荐Kimi，https://platform.moonshot.cn/）API密钥，用于主LLM。您可以更改每个部分LLM使用的API，🚩只要兼容OpenAI请求格式都可以，定义好KEY、BASE_URL与MODEL_NAME即可正常使用。重要提醒：我们强烈推荐您先使用推荐的配置申请API，先跑通再进行您的更改！")
@@ -68,11 +71,42 @@ class Settings(BaseSettings):
     # ================== 网络工具配置 ====================
     # Tavily API（申请地址：https://www.tavily.com/）
     TAVILY_API_KEY: Optional[str] = Field(None, description="Tavily API（申请地址：https://www.tavily.com/）API密钥，用于Tavily网络搜索")
-    
+
     BOCHA_BASE_URL: Optional[str] = Field("https://api.bochaai.com/v1/ai-search", description="Bocha AI 搜索BaseUrl或博查网页搜索BaseUrl")
     # Bocha API（申请地址：https://open.bochaai.com/）
     BOCHA_WEB_SEARCH_API_KEY: Optional[str] = Field(None, description="Bocha API（申请地址：https://open.bochaai.com/）API密钥，用于Bocha搜索")
-    
+
+    # ================== 新增信息源配置 ====================
+    # Alpha Vantage - 金融数据
+    ALPHAVANTAGE_API_KEY: Optional[str] = Field(None, description="Alpha Vantage (alphavantage.co) API密钥，用于金融数据")
+    ALPHAVANTAGE_BASE_URL: Optional[str] = Field("https://www.alphavantage.co/query", description="Alpha Vantage Base URL")
+
+    # Semantic Scholar - 学术论文
+    SEMANTIC_SCHOLAR_API_KEY: Optional[str] = Field(None, description="Semantic Scholar API密钥，用于学术论文检索")
+    SEMANTIC_SCHOLAR_BASE_URL: Optional[str] = Field("https://api.semanticscholar.org/graph/v1", description="Semantic Scholar Base URL")
+
+    # Reddit API - 社交媒体讨论
+    REDDIT_CLIENT_ID: Optional[str] = Field(None, description="Reddit API Client ID")
+    REDDIT_CLIENT_SECRET: Optional[str] = Field(None, description="Reddit API Client Secret")
+    REDDIT_USER_AGENT: str = Field("BettaFish/1.0", description="Reddit API User Agent")
+    REDDIT_BASE_URL: Optional[str] = Field("https://oauth.reddit.com", description="Reddit API Base URL")
+
+    # YouTube Data API - 视频内容分析
+    YOUTUBE_API_KEY: Optional[str] = Field(None, description="YouTube Data API密钥，用于视频内容分析")
+    YOUTUBE_BASE_URL: Optional[str] = Field("https://www.googleapis.com/youtube/v3", description="YouTube Data API Base URL")
+
+    # HackerNews API - 科技社区讨论
+    HACKERNEWS_BASE_URL: Optional[str] = Field("https://hacker-news.firebaseio.com/v0", description="HackerNews API Base URL")
+
+    # RSS Feed URLs
+    RSS_FEEDS: Optional[str] = Field(None, description="RSS Feed URLs (comma-separated)")
+
+    # ArXiv API - 学术预印本
+    ARXIV_BASE_URL: Optional[str] = Field("http://export.arxiv.org/api/query", description="ArXiv API Base URL")
+
+    # GDELT Project - 全球事件检测
+    GDELT_BASE_URL: Optional[str] = Field("https://api.gdeltproject.org/api/v2", description="GDELT Project Base URL")
+
     # ================== Insight Engine 搜索配置 ====================
     DEFAULT_SEARCH_HOT_CONTENT_LIMIT: int = Field(100, description="热榜内容默认最大数")
     DEFAULT_SEARCH_TOPIC_GLOBALLY_LIMIT_PER_TABLE: int = Field(50, description="按表全局话题最大数")

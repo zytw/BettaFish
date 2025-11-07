@@ -25,12 +25,14 @@ V3.0 核心更新:
 
 import os
 import json
+import requests
 from loguru import logger
 import asyncio
 from typing import List, Dict, Any, Optional, Literal
 from dataclasses import dataclass, field
 from ..utils.db import fetch_all
 from datetime import datetime, timedelta, date
+from config import settings
 
 # --- 1. 数据结构定义 ---
 
@@ -454,3 +456,308 @@ if __name__ == "__main__":
         logger.exception("请确保相关的数据库环境变量已正确设置, 或在代码中直接提供连接信息。")
     except Exception as e:
         logger.exception(f"测试过程中发生未知错误: {e}")
+
+
+# ================== 新增外部数据源 ====================
+
+@dataclass
+class FinancialData:
+    """金融数据结构"""
+    symbol: str
+    price: float
+    change: float
+    change_percent: float
+    volume: int
+    market_cap: Optional[float] = None
+    timestamp: str = ""
+
+
+@dataclass
+class GlobalEvent:
+    """全球事件数据结构"""
+    event_id: str
+    event_date: str
+    actor1: str
+    actor2: str
+    event_code: str
+    event_base_code: str
+    goldstein_score: float
+    num_tones: int
+    avg_tone: float
+    quad_class: str
+
+
+class AlphaVantageClient:
+    """Alpha Vantage 金融数据客户端"""
+
+    def __init__(self, api_key: Optional[str] = None):
+        if api_key is None:
+            api_key = settings.ALPHAVANTAGE_API_KEY
+
+        if not api_key:
+            raise ValueError("Alpha Vantage API密钥未找到")
+
+        self.api_key = api_key
+        self.base_url = settings.ALPHAVANTAGE_BASE_URL or "https://www.alphavantage.co/query"
+
+    def get_quote(self, symbol: str) -> Optional[FinancialData]:
+        """获取股票报价"""
+        print(f"--- TOOL: 获取股票报价 (symbol: {symbol}) ---")
+
+        params = {
+            'function': 'GLOBAL_QUOTE',
+            'symbol': symbol,
+            'apikey': self.api_key
+        }
+
+        try:
+            response = requests.get(self.base_url, params=params)
+            response.raise_for_status()
+            data = response.json()
+
+            quote = data.get('Global Quote', {})
+            if not quote:
+                logger.warning(f"未找到股票 {symbol} 的数据")
+                return None
+
+            return FinancialData(
+                symbol=quote.get('01. symbol', symbol),
+                price=float(quote.get('05. price', 0)),
+                change=float(quote.get('09. change', 0)),
+                change_percent=float(quote.get('10. change percent', '0%').replace('%', '')),
+                volume=int(quote.get('06. volume', 0)),
+                timestamp=quote.get('07. latest trading day', '')
+            )
+        except Exception as e:
+            logger.error(f"Alpha Vantage报价错误: {e}")
+            return None
+
+    def search_symbol(self, keywords: str) -> List[Dict[str, str]]:
+        """搜索股票代码"""
+        print(f"--- TOOL: 搜索股票 (keywords: {keywords}) ---")
+
+        params = {
+            'function': 'SYMBOL_SEARCH',
+            'keywords': keywords,
+            'apikey': self.api_key
+        }
+
+        try:
+            response = requests.get(self.base_url, params=params)
+            response.raise_for_status()
+            data = response.json()
+
+            matches = data.get('bestMatches', [])
+            results = []
+            for match in matches[:10]:  # 限制返回前10个
+                results.append({
+                    'symbol': match.get('1. symbol', ''),
+                    'name': match.get('2. name', ''),
+                    'region': match.get('4. region', ''),
+                    'currency': match.get('8. currency', '')
+                })
+
+            return results
+        except Exception as e:
+            logger.error(f"Alpha Vantage搜索错误: {e}")
+            return []
+
+    def get_daily_series(self, symbol: str, output_size: str = 'compact') -> List[Dict[str, Any]]:
+        """获取股票日线数据"""
+        print(f"--- TOOL: 获取日线数据 (symbol: {symbol}) ---")
+
+        params = {
+            'function': 'TIME_SERIES_DAILY',
+            'symbol': symbol,
+            'outputsize': output_size,
+            'apikey': self.api_key
+        }
+
+        try:
+            response = requests.get(self.base_url, params=params)
+            response.raise_for_status()
+            data = response.json()
+
+            time_series = data.get('Time Series (Daily)', {})
+            results = []
+
+            for date_str, values in list(time_series.items())[:100]:  # 限制100天
+                results.append({
+                    'date': date_str,
+                    'open': float(values.get('1. open', 0)),
+                    'high': float(values.get('2. high', 0)),
+                    'low': float(values.get('3. low', 0)),
+                    'close': float(values.get('4. close', 0)),
+                    'volume': int(values.get('5. volume', 0))
+                })
+
+            return results
+        except Exception as e:
+            logger.error(f"Alpha Vantage日线数据错误: {e}")
+            return []
+
+
+class GDELTClient:
+    """GDELT Project 全球事件数据客户端"""
+
+    def __init__(self):
+        self.base_url = settings.GDELT_BASE_URL or "https://api.gdeltproject.org/api/v2"
+
+    def search_events(self, query: str, start_date: str, end_date: str, max_events: int = 100) -> List[GlobalEvent]:
+        """搜索全球事件"""
+        print(f"--- TOOL: 搜索全球事件 (query: {query}, {start_date} to {end_date}) ---")
+
+        params = {
+            'query': query,
+            'startdatetime': start_date.replace('-', ''),
+            'enddatetime': end_date.replace('-', ''),
+            'maxevents': max_events,
+            'format': 'json',
+            'sort': 'DateDesc'
+        }
+
+        try:
+            response = requests.get(f"{self.base_url}/doc/doc", params=params)
+            response.raise_for_status()
+            data = response.json()
+
+            events = []
+            for event_data in data.get('events', []):
+                events.append(GlobalEvent(
+                    event_id=event_data.get('eventid', ''),
+                    event_date=event_data.get('sqldate', ''),
+                    actor1=event_data.get('actor1name', ''),
+                    actor2=event_data.get('actor2name', ''),
+                    event_code=event_data.get('eventcode', ''),
+                    event_base_code=event_data.get('eventbasecode', ''),
+                    goldstein_score=float(event_data.get('goldsteinscore', 0)),
+                    num_tones=int(event_data.get('numtones', 0)),
+                    avg_tone=float(event_data.get('avgtone', 0)),
+                    quad_class=event_data.get('quadclass', '')
+                ))
+
+            return events
+        except Exception as e:
+            logger.error(f"GDELT事件搜索错误: {e}")
+            return []
+
+    def get_event_details(self, event_id: str) -> Optional[GlobalEvent]:
+        """获取事件详情"""
+        try:
+            params = {
+                'id': event_id,
+                'format': 'json'
+            }
+
+            response = requests.get(f"{self.base_url}/doc/doc", params=params)
+            response.raise_for_status()
+            data = response.json()
+
+            if not data.get('events'):
+                return None
+
+            event_data = data['events'][0]
+            return GlobalEvent(
+                event_id=event_data.get('eventid', ''),
+                event_date=event_data.get('sqldate', ''),
+                actor1=event_data.get('actor1name', ''),
+                actor2=event_data.get('actor2name', ''),
+                event_code=event_data.get('eventcode', ''),
+                event_base_code=event_data.get('eventbasecode', ''),
+                goldstein_score=float(event_data.get('goldsteinscore', 0)),
+                num_tones=int(event_data.get('numtones', 0)),
+                avg_tone=float(event_data.get('avgtone', 0)),
+                quad_class=event_data.get('quadclass', '')
+            )
+        except Exception as e:
+            logger.error(f"GDELT事件详情错误: {e}")
+            return None
+
+    def get_country_events(self, country_code: str, start_date: str, end_date: str, max_events: int = 100) -> List[GlobalEvent]:
+        """获取特定国家的事件"""
+        query = f"country:{country_code}"
+        return self.search_events(query, start_date, end_date, max_events)
+
+
+# ================== 统一洞察分析引擎 ====================
+
+class ComprehensiveInsightEngine:
+    """统一洞察分析引擎，整合本地数据库和外部数据源"""
+
+    def __init__(self):
+        self.db_agent = None
+        self.alpha_vantage = None
+        self.gdelt = None
+
+        # 初始化可用的客户端
+        try:
+            self.db_agent = MediaCrawlerDB()
+        except:
+            print("警告: 本地数据库未配置")
+
+        try:
+            self.alpha_vantage = AlphaVantageClient()
+        except:
+            print("警告: Alpha Vantage未配置")
+
+        try:
+            self.gdelt = GDELTClient()
+        except:
+            print("警告: GDELT未配置")
+
+    def comprehensive_analysis(self, query: str, time_period: str = 'week', financial_symbol: Optional[str] = None, country_code: Optional[str] = None) -> Dict[str, Any]:
+        """综合分析 - 结合本地数据、财务数据和全球事件"""
+        results = {
+            'local_database': [],
+            'financial_data': None,
+            'global_events': []
+        }
+
+        # 1. 本地数据库分析
+        if self.db_agent:
+            try:
+                results['local_database'] = self.db_agent.search_topic_globally(query, limit_per_table=20)
+            except Exception as e:
+                logger.error(f"本地数据库查询错误: {e}")
+
+        # 2. 财务数据分析
+        if financial_symbol and self.alpha_vantage:
+            try:
+                results['financial_data'] = self.alpha_vantage.get_quote(financial_symbol)
+            except Exception as e:
+                logger.error(f"财务数据查询错误: {e}")
+
+        # 3. 全球事件分析
+        if country_code and self.gdelt:
+            try:
+                end_date = datetime.now().strftime('%Y-%m-%d')
+                start_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+                results['global_events'] = self.gdelt.get_country_events(country_code, start_date, end_date)
+            except Exception as e:
+                logger.error(f"全球事件查询错误: {e}")
+
+        return results
+
+
+# ================== 测试代码 ====================
+
+if __name__ == "__main__":
+    try:
+        engine = ComprehensiveInsightEngine()
+
+        print("=== 场景1: 综合洞察分析 ===")
+        results = engine.comprehensive_analysis(
+            query="人工智能",
+            financial_symbol="AAPL",
+            country_code="US"
+        )
+
+        for source, data in results.items():
+            print(f"\n{source.upper()}:")
+            if isinstance(data, list):
+                print(f"  找到 {len(data)} 条记录")
+            elif data:
+                print(f"  数据可用: {type(data).__name__}")
+
+    except Exception as e:
+        logger.exception(f"测试过程中发生错误: {e}")

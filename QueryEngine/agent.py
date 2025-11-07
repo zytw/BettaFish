@@ -19,7 +19,7 @@ from .nodes import (
     ReportFormattingNode
 )
 from .state import State
-from .tools import TavilyNewsAgency, TavilyResponse
+from .tools import ComprehensiveSearchEngine
 from .utils import Settings, format_search_results_for_prompt
 from loguru import logger
 
@@ -41,20 +41,24 @@ class DeepSearchAgent:
         self.llm_client = self._initialize_llm()
         
         # 初始化搜索工具集
-        self.search_agency = TavilyNewsAgency(api_key=self.config.TAVILY_API_KEY)
-        
+        try:
+            self.search_agency = ComprehensiveSearchEngine()
+            logger.info("搜索工具集: ComprehensiveSearchEngine (支持5种搜索源)")
+        except Exception as e:
+            logger.warning(f"搜索工具集初始化失败: {e}")
+            self.search_agency = None
+
         # 初始化节点
         self._initialize_nodes()
-        
+
         # 状态
         self.state = State()
-        
+
         # 确保输出目录存在
         os.makedirs(self.config.OUTPUT_DIR, exist_ok=True)
-        
+
         logger.info(f"Query Agent已初始化")
         logger.info(f"使用LLM: {self.llm_client.get_model_info()}")
-        logger.info(f"搜索工具集: TavilyNewsAgency (支持6种搜索工具)")
     
     def _initialize_llm(self) -> LLMClient:
         """初始化LLM客户端"""
@@ -97,47 +101,23 @@ class DeepSearchAgent:
         except ValueError:
             return False
     
-    def execute_search_tool(self, tool_name: str, query: str, **kwargs) -> TavilyResponse:
+    def execute_search_tool(self, tool_name: str, query: str, **kwargs):
         """
         执行指定的搜索工具
-        
-        Args:
-            tool_name: 工具名称，可选值：
-                - "basic_search_news": 基础新闻搜索（快速、通用）
-                - "deep_search_news": 深度新闻分析
-                - "search_news_last_24_hours": 24小时内最新新闻
-                - "search_news_last_week": 本周新闻
-                - "search_images_for_news": 新闻图片搜索
-                - "search_news_by_date": 按日期范围搜索新闻
-            query: 搜索查询
-            **kwargs: 额外参数（如start_date, end_date, max_results）
-            
-        Returns:
-            TavilyResponse对象
+
+        注意: 此方法已简化以适应新的搜索架构
+        请使用 search_agency.search_all_sources() 进行综合搜索
         """
         logger.info(f"  → 执行搜索工具: {tool_name}")
-        
-        if tool_name == "basic_search_news":
-            max_results = kwargs.get("max_results", 7)
-            return self.search_agency.basic_search_news(query, max_results)
-        elif tool_name == "deep_search_news":
-            return self.search_agency.deep_search_news(query)
-        elif tool_name == "search_news_last_24_hours":
-            return self.search_agency.search_news_last_24_hours(query)
-        elif tool_name == "search_news_last_week":
-            return self.search_agency.search_news_last_week(query)
-        elif tool_name == "search_images_for_news":
-            return self.search_agency.search_images_for_news(query)
-        elif tool_name == "search_news_by_date":
-            start_date = kwargs.get("start_date")
-            end_date = kwargs.get("end_date")
-            if not start_date or not end_date:
-                raise ValueError("search_news_by_date工具需要start_date和end_date参数")
-            return self.search_agency.search_news_by_date(query, start_date, end_date)
-        else:
-            logger.warning(f"  ⚠️  未知的搜索工具: {tool_name}，使用默认基础搜索")
-            return self.search_agency.basic_search_news(query)
-    
+        logger.warning("此方法已简化，请使用 ComprehensiveSearchEngine.search_all_sources()")
+
+        if not self.search_agency:
+            raise ValueError("搜索工具集未初始化")
+
+        # 简化的实现，返回所有源的搜索结果
+        max_results = kwargs.get("max_results", 5)
+        return self.search_agency.search_all_sources(query, max_results=max_results)
+
     def research(self, query: str, save_report: bool = True) -> str:
         """
         执行深度研究
@@ -262,10 +242,16 @@ class DeepSearchAgent:
         
         # 转换为兼容格式
         search_results = []
-        if search_response and search_response.results:
-            # 每种搜索工具都有其特定的结果数量，这里取前10个作为上限
-            max_results = min(len(search_response.results), 10)
-            for result in search_response.results[:max_results]:
+        if search_response and isinstance(search_response, dict):
+            # search_response 是字典格式: {source_name: [SearchResult_list]}
+            all_results = []
+            for source_name, results_list in search_response.items():
+                if results_list:
+                    all_results.extend(results_list)
+
+            # 取前10个作为上限
+            max_results = min(len(all_results), 10)
+            for result in all_results[:max_results]:
                 search_results.append({
                     'title': result.title,
                     'url': result.url,
@@ -353,10 +339,16 @@ class DeepSearchAgent:
             
             # 转换为兼容格式
             search_results = []
-            if search_response and search_response.results:
-                # 每种搜索工具都有其特定的结果数量，这里取前10个作为上限
-                max_results = min(len(search_response.results), 10)
-                for result in search_response.results[:max_results]:
+            if search_response and isinstance(search_response, dict):
+                # search_response 是字典格式: {source_name: [SearchResult_list]}
+                all_results = []
+                for source_name, results_list in search_response.items():
+                    if results_list:
+                        all_results.extend(results_list)
+
+                # 取前10个作为上限
+                max_results = min(len(all_results), 10)
+                for result in all_results[:max_results]:
                     search_results.append({
                         'title': result.title,
                         'url': result.url,

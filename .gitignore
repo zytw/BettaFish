@@ -344,3 +344,10 @@ insight_engine_streamlit_reports/
 media_engine_streamlit_reports/
 query_engine_streamlit_reports/
 final_reports/
+# ==== 额外敏感文件 ====
+.env.production
+setup_api_keys.py
+test_api_keys.py
+*.md (Chinese test files)
+comprehensive_integration_test.py
+test_*.py

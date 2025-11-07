@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   bettafish:
     build:
@@ -18,8 +16,12 @@ services:
       - "8502:8502"
       - "8503:8503"
     volumes:
-      - ./logs:/app/logs
-      - ./final_reports:/app/final_reports
-      - ./insight_engine_streamlit_reports:/app/insight_engine_streamlit_reports
-      - ./media_engine_streamlit_reports:/app/media_engine_streamlit_reports
-      - ./query_engine_streamlit_reports:/app/query_engine_streamlit_reports
+      # 本地报告目录映射 - 所有生成的报告统一存储到本地
+      - D:/bettafish/reports:/app/reports
+      # 其他报告目录映射
+      - D:\Documents\codes\BettaFish\final_reports:/app/final_reports
+      - D:\Documents\codes\BettaFish\insight_engine_streamlit_reports:/app/insight_engine_streamlit_reports
+      - D:\Documents\codes\BettaFish\media_engine_streamlit_reports:/app/media_engine_streamlit_reports
+      - D:\Documents\codes\BettaFish\query_engine_streamlit_reports:/app/query_engine_streamlit_reports
+      # 本地日志目录映射
+      - D:\Documents\codes\BettaFish\logs:/app/logs

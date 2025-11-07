@@ -388,3 +388,262 @@ AI摘要: 量子计算商业化正在逐步推进。
         logger.error("请确保 BOCHA_API_KEY 环境变量已正确设置。")
     except Exception as e:
         logger.exception(f"测试过程中发生未知错误: {e}")
+
+
+# ================== 新增多模态信息源 ====================
+
+@dataclass
+class RSSItem:
+    """RSS订阅项数据结构"""
+    title: str
+    description: str
+    link: str
+    pub_date: str
+    source: str
+
+
+@dataclass
+class YouTubeVideo:
+    """YouTube视频数据结构"""
+    title: str
+    description: str
+    video_id: str
+    channel_title: str
+    published_at: str
+    view_count: Optional[int] = None
+    duration: Optional[str] = None
+
+
+class RSSFeedReader:
+    """RSS Feed 阅读器 - 博客和新闻订阅"""
+
+    def __init__(self):
+        # 可以从环境变量获取自定义RSS源列表
+        self.rss_feeds = settings.RSS_FEEDS
+        self.feed_list = [
+            "https://feeds.feedburner.com/oreilly/radar",
+            "https://hnrss.org/frontpage",
+            "https://www.reddit.com/r/MachineLearning/.rss",
+            "https://techcrunch.com/feed/",
+            "https://www.theverge.com/rss/index.xml"
+        ]
+
+    def parse_feed(self, feed_url: str) -> List[RSSItem]:
+        """解析单个RSS源"""
+        try:
+            import feedparser
+        except ImportError:
+            raise ImportError("feedparser库未安装，请运行 `pip install feedparser`")
+
+        try:
+            feed = feedparser.parse(feed_url)
+            items = []
+
+            for entry in feed.entries[:20]:  # 限制每源最多20条
+                items.append(RSSItem(
+                    title=entry.get('title', ''),
+                    description=entry.get('summary', ''),
+                    link=entry.get('link', ''),
+                    pub_date=entry.get('published', ''),
+                    source=feed.feed.get('title', feed_url)
+                ))
+
+            return items
+        except Exception as e:
+            logger.error(f"RSS解析错误 {feed_url}: {e}")
+            return []
+
+    def read_multiple_feeds(self, feed_urls: Optional[List[str]] = None) -> Dict[str, List[RSSItem]]:
+        """读取多个RSS源"""
+        if feed_urls is None:
+            if self.rss_feeds:
+                feed_urls = [url.strip() for url in self.rss_feeds.split(',')]
+            else:
+                feed_urls = self.feed_list
+
+        print(f"--- TOOL: 读取RSS订阅 (共{len(feed_urls)}个源) ---")
+
+        results = {}
+        for feed_url in feed_urls:
+            try:
+                results[feed_url] = self.parse_feed(feed_url)
+            except Exception as e:
+                logger.error(f"读取RSS源失败 {feed_url}: {e}")
+                results[feed_url] = []
+
+        return results
+
+    def search_feeds(self, query: str, feed_urls: Optional[List[str]] = None) -> List[RSSItem]:
+        """在RSS内容中搜索"""
+        all_items = []
+        feed_results = self.read_multiple_feeds(feed_urls)
+
+        for feed_url, items in feed_results.items():
+            for item in items:
+                if query.lower() in item.title.lower() or query.lower() in item.description.lower():
+                    all_items.append(item)
+
+        print(f"--- TOOL: RSS搜索 (query: {query}, 找到{len(all_items)}条) ---")
+        return all_items
+
+
+class YouTubeDataClient:
+    """YouTube Data API 客户端 - 视频内容分析"""
+
+    def __init__(self, api_key: Optional[str] = None):
+        if api_key is None:
+            api_key = settings.YOUTUBE_API_KEY
+
+        if not api_key:
+            raise ValueError("YouTube API密钥未找到")
+
+        self.api_key = api_key
+        self.base_url = settings.YOUTUBE_BASE_URL or "https://www.googleapis.com/youtube/v3"
+
+    @with_graceful_retry(SEARCH_API_RETRY_CONFIG, default_return=[])
+    def search_videos(self, query: str, max_results: int = 10, published_after: Optional[str] = None) -> List[YouTubeVideo]:
+        """搜索YouTube视频"""
+        print(f"--- TOOL: YouTube搜索 (query: {query}) ---")
+
+        params = {
+            'part': 'snippet',
+            'q': query,
+            'type': 'video',
+            'maxResults': min(max_results, 50),
+            'key': self.api_key,
+            'order': 'relevance'
+        }
+
+        if published_after:
+            params['publishedAfter'] = published_after
+
+        try:
+            response = requests.get(f"{self.base_url}/search", params=params)
+            response.raise_for_status()
+            data = response.json()
+
+            videos = []
+            for item in data.get('items', []):
+                video_id = item['id']['videoId']
+                snippet = item['snippet']
+
+                videos.append(YouTubeVideo(
+                    title=snippet['title'],
+                    description=snippet['description'],
+                    video_id=video_id,
+                    channel_title=snippet['channelTitle'],
+                    published_at=snippet['publishedAt']
+                ))
+
+            return videos
+        except Exception as e:
+            logger.error(f"YouTube搜索错误: {e}")
+            return []
+
+    def get_video_details(self, video_id: str) -> Optional[YouTubeVideo]:
+        """获取视频详细信息"""
+        try:
+            params = {
+                'part': 'snippet,statistics,contentDetails',
+                'id': video_id,
+                'key': self.api_key
+            }
+
+            response = requests.get(f"{self.base_url}/videos", params=params)
+            response.raise_for_status()
+            data = response.json()
+
+            if not data.get('items'):
+                return None
+
+            item = data['items'][0]
+            snippet = item['snippet']
+            stats = item.get('statistics', {})
+            content = item.get('contentDetails', {})
+
+            return YouTubeVideo(
+                title=snippet['title'],
+                description=snippet['description'],
+                video_id=video_id,
+                channel_title=snippet['channelTitle'],
+                published_at=snippet['publishedAt'],
+                view_count=int(stats.get('viewCount', 0)),
+                duration=content.get('duration', '')
+            )
+        except Exception as e:
+            logger.error(f"YouTube视频详情错误: {e}")
+            return None
+
+
+# ================== 统一多模态搜索引擎 ====================
+
+class MultimodalContentEngine:
+    """统一多模态内容引擎，整合所有媒体信息源"""
+
+    def __init__(self):
+        self.bocha = None
+        self.rss_reader = None
+        self.youtube = None
+
+        # 初始化可用的客户端
+        try:
+            self.bocha = BochaMultimodalSearch()
+        except:
+            print("警告: Bocha搜索未配置")
+
+        try:
+            self.rss_reader = RSSFeedReader()
+        except:
+            print("警告: RSS阅读器初始化失败")
+
+        try:
+            self.youtube = YouTubeDataClient()
+        except:
+            print("警告: YouTube API未配置")
+
+    def comprehensive_media_search(self, query: str, sources: Optional[List[str]] = None, max_results: int = 10) -> Dict[str, Any]:
+        """综合多模态内容搜索"""
+        if sources is None:
+            sources = ['bocha', 'rss', 'youtube']
+
+        results = {
+            'bocha_web_results': [],
+            'rss_items': [],
+            'youtube_videos': []
+        }
+
+        for source in sources:
+            try:
+                if source == 'bocha' and self.bocha:
+                    response = self.bocha.comprehensive_search(query, max_results)
+                    results['bocha_web_results'] = {
+                        'webpages': response.webpages,
+                        'images': response.images,
+                        'modal_cards': response.modal_cards,
+                        'answer': response.answer
+                    }
+                elif source == 'rss' and self.rss_reader:
+                    results['rss_items'] = self.rss_reader.search_feeds(query)
+                elif source == 'youtube' and self.youtube:
+                    results['youtube_videos'] = self.youtube.search_videos(query, max_results)
+            except Exception as e:
+                logger.error(f"媒体源 {source} 搜索错误: {e}")
+
+        return results
+
+
+# ================== 测试代码 ====================
+
+if __name__ == "__main__":
+    try:
+        # 初始化多模态引擎
+        engine = MultimodalContentEngine()
+
+        print("=== 场景1: 综合媒体搜索 ===")
+        results = engine.comprehensive_media_search("人工智能", max_results=5)
+        for source, data in results.items():
+            if data:
+                print(f"\n{source}: {len(data) if isinstance(data, list) else len(data.get('webpages', []))} 项")
+
+    except Exception as e:
+        logger.exception(f"测试过程中发生错误: {e}")
