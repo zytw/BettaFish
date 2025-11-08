@@ -52,7 +52,7 @@ class ReportStructureNode(StateMutationNode):
             logger.info(f"正在为查询生成报告结构: {self.query}")
             
             # 调用LLM
-            response = self.llm_client.invoke(SYSTEM_PROMPT_REPORT_STRUCTURE, self.query)
+            response = self.llm_client.stream_invoke_to_string(SYSTEM_PROMPT_REPORT_STRUCTURE, self.query)
             
             # 处理响应
             processed_response = self.process_output(response)
@@ -87,7 +87,7 @@ class ReportStructureNode(StateMutationNode):
                 report_structure = json.loads(cleaned_output)
                 logger.info("JSON解析成功")
             except JSONDecodeError as e:
-                logger.exception(f"JSON解析失败: {str(e)}")
+                logger.error(f"JSON解析失败: {str(e)}")
                 # 使用更强大的提取方法
                 report_structure = extract_clean_response(cleaned_output)
                 if "error" in report_structure:

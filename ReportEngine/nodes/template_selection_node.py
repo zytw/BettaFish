@@ -115,7 +115,7 @@ class TemplateSelectionNode(BaseNode):
 请根据查询内容、报告内容和论坛日志的具体情况，选择最合适的模板。"""
         
         # 调用LLM
-        response = self.llm_client.invoke(SYSTEM_PROMPT_TEMPLATE_SELECTION, user_message)
+        response = self.llm_client.stream_invoke_to_string(SYSTEM_PROMPT_TEMPLATE_SELECTION, user_message)
         
         # 检查响应是否为空
         if not response or not response.strip():
@@ -145,7 +145,7 @@ class TemplateSelectionNode(BaseNode):
             return None
             
         except json.JSONDecodeError as e:
-            logger.exception(f"JSON解析失败: {str(e)}")
+            logger.error(f"JSON解析失败: {str(e)}")
             # 尝试从文本响应中提取模板信息
             return self._extract_template_from_text(response, available_templates)
     

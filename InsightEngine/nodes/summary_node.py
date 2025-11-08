@@ -99,8 +99,8 @@ class FirstSummaryNode(StateMutationNode):
             
             logger.info("正在生成首次段落总结")
             
-            # 调用LLM
-            response = self.llm_client.invoke(SYSTEM_PROMPT_FIRST_SUMMARY, message)
+            # 调用LLM（流式，安全拼接UTF-8）
+            response = self.llm_client.stream_invoke_to_string(SYSTEM_PROMPT_FIRST_SUMMARY, message)
             
             # 处理响应
             processed_response = self.process_output(response)
@@ -135,7 +135,7 @@ class FirstSummaryNode(StateMutationNode):
                 result = json.loads(cleaned_output)
                 logger.info("JSON解析成功")
             except JSONDecodeError as e:
-                logger.exception(f"JSON解析失败: {str(e)}")
+                logger.error(f"JSON解析失败: {str(e)}")
                 # 尝试修复JSON
                 fixed_json = fix_incomplete_json(cleaned_output)
                 if fixed_json:
@@ -264,8 +264,8 @@ class ReflectionSummaryNode(StateMutationNode):
             
             logger.info("正在生成反思总结")
             
-            # 调用LLM
-            response = self.llm_client.invoke(SYSTEM_PROMPT_REFLECTION_SUMMARY, message)
+            # 调用LLM（流式，安全拼接UTF-8）
+            response = self.llm_client.stream_invoke_to_string(SYSTEM_PROMPT_REFLECTION_SUMMARY, message)
             
             # 处理响应
             processed_response = self.process_output(response)
@@ -300,7 +300,7 @@ class ReflectionSummaryNode(StateMutationNode):
                 result = json.loads(cleaned_output)
                 logger.info("JSON解析成功")
             except JSONDecodeError as e:
-                logger.exception(f"JSON解析失败: {str(e)}")
+                logger.error(f"JSON解析失败: {str(e)}")
                 # 尝试修复JSON
                 fixed_json = fix_incomplete_json(cleaned_output)
                 if fixed_json:
@@ -308,11 +308,11 @@ class ReflectionSummaryNode(StateMutationNode):
                         result = json.loads(fixed_json)
                         logger.info("JSON修复成功")
                     except JSONDecodeError:
-                        logger.info("JSON修复失败，直接使用清理后的文本")
+                        logger.error("JSON修复失败，直接使用清理后的文本")
                         # 如果不是JSON格式，直接返回清理后的文本
                         return cleaned_output
                 else:
-                    logger.info("无法修复JSON，直接使用清理后的文本")
+                    logger.error("无法修复JSON，直接使用清理后的文本")
                     # 如果不是JSON格式，直接返回清理后的文本
                     return cleaned_output
             
