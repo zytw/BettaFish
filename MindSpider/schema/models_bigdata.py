@@ -40,7 +40,7 @@ class BilibiliVideo(Base):
     video_cover_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_keyword: Mapped[str | None] = mapped_column(Text, default='', nullable=True)
     topic_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("daily_topics.topic_id", ondelete="SET NULL"), nullable=True)
-    crawling_task_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("crawling_tasks.task_id", ondelete="SET NULL"), nullable=True)
+    crawling_task_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("crawling_tasks.id", ondelete="SET NULL"), nullable=True)
 
 class BilibiliVideoComment(Base):
     __tablename__ = "bilibili_video_comment"
@@ -137,7 +137,7 @@ class DouyinAweme(Base):
     note_download_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_keyword: Mapped[str | None] = mapped_column(Text, default='', nullable=True)
     topic_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("daily_topics.topic_id", ondelete="SET NULL"), nullable=True)
-    crawling_task_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("crawling_tasks.task_id", ondelete="SET NULL"), nullable=True)
+    crawling_task_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("crawling_tasks.id", ondelete="SET NULL"), nullable=True)
 
 class DouyinAwemeComment(Base):
     __tablename__ = "douyin_aweme_comment"
@@ -199,7 +199,7 @@ class KuaishouVideo(Base):
     video_play_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_keyword: Mapped[str | None] = mapped_column(Text, default='', nullable=True)
     topic_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("daily_topics.topic_id", ondelete="SET NULL"), nullable=True)
-    crawling_task_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("crawling_tasks.task_id", ondelete="SET NULL"), nullable=True)
+    crawling_task_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("crawling_tasks.id", ondelete="SET NULL"), nullable=True)
 
 class KuaishouVideoComment(Base):
     __tablename__ = "kuaishou_video_comment"
@@ -236,7 +236,7 @@ class WeiboNote(Base):
     note_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_keyword: Mapped[str | None] = mapped_column(Text, default='', nullable=True)
     topic_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("daily_topics.topic_id", ondelete="SET NULL"), nullable=True)
-    crawling_task_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("crawling_tasks.task_id", ondelete="SET NULL"), nullable=True)
+    crawling_task_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("crawling_tasks.id", ondelete="SET NULL"), nullable=True)
 
 class WeiboNoteComment(Base):
     __tablename__ = "weibo_note_comment"
@@ -318,7 +318,7 @@ class XhsNote(Base):
     source_keyword: Mapped[str | None] = mapped_column(Text, default='', nullable=True)
     xsec_token: Mapped[str | None] = mapped_column(Text, nullable=True)
     topic_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("daily_topics.topic_id", ondelete="SET NULL"), nullable=True)
-    crawling_task_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("crawling_tasks.task_id", ondelete="SET NULL"), nullable=True)
+    crawling_task_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("crawling_tasks.id", ondelete="SET NULL"), nullable=True)
 
 
 class XhsNoteComment(Base):
@@ -360,7 +360,7 @@ class TiebaNote(Base):
     last_modify_ts: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     source_keyword: Mapped[str | None] = mapped_column(Text, default='', nullable=True)
     topic_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("daily_topics.topic_id", ondelete="SET NULL"), nullable=True)
-    crawling_task_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("crawling_tasks.task_id", ondelete="SET NULL"), nullable=True)
+    crawling_task_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("crawling_tasks.id", ondelete="SET NULL"), nullable=True)
 
 class TiebaComment(Base):
     __tablename__ = "tieba_comment"
@@ -422,7 +422,7 @@ class ZhihuContent(Base):
     add_ts: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     last_modify_ts: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     topic_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("daily_topics.topic_id", ondelete="SET NULL"), nullable=True)
-    crawling_task_id: Mapped[str | None] = mapped_column(String(64), ForeignKey("crawling_tasks.task_id", ondelete="SET NULL"), nullable=True)
+    crawling_task_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("crawling_tasks.id", ondelete="SET NULL"), nullable=True)
 
 class ZhihuComment(Base):
     __tablename__ = "zhihu_comment"

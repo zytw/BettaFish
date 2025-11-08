@@ -11,6 +11,16 @@ from loguru import logger
 
 class Settings(BaseSettings):
     """Report Engine 配置，环境变量与字段均为REPORT_ENGINE_前缀一致大写。"""
+
+    # ====================== 数据库配置 ======================
+    DB_HOST: Optional[str] = Field("bettafish-db", description="数据库主机，PostgreSQL容器服务名")
+    DB_USER: Optional[str] = Field("bettafish", description="数据库用户名")
+    DB_PASSWORD: Optional[str] = Field("bettafish", description="数据库密码")
+    DB_NAME: Optional[str] = Field("bettafish", description="数据库名称")
+    DB_PORT: int = Field(5432, description="数据库端口，PostgreSQL默认为5432")
+    DB_CHARSET: str = Field("", description="数据库字符集，PostgreSQL不需要此参数")
+    DB_DIALECT: Optional[str] = Field("postgresql", description="数据库方言，如mysql、postgresql等，SQLAlchemy后端选择")
+
     REPORT_ENGINE_API_KEY: Optional[str] = Field(None, description="Report Engine LLM API密钥")
     REPORT_ENGINE_BASE_URL: Optional[str] = Field(None, description="Report Engine LLM基础URL")
     REPORT_ENGINE_MODEL_NAME: Optional[str] = Field(None, description="Report Engine LLM模型名称")

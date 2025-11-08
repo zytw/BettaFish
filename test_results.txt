@@ -1,0 +1,110 @@
+BettaFish 所有信息源综合集成测试
+================================================================================
+=== 1. 配置API定义测试 ===
+
+有API密钥的配置项:
+   [OK] Tavily搜索: TAVILY_API_KEY = tvly-dev-bO35VWBv5YI...
+   [OK] Bocha搜索: BOCHA_WEB_SEARCH_API_KEY = your_bocha_api_key...
+   [OK] Semantic Scholar: SEMANTIC_SCHOLAR_API_KEY = your_semantic_schola...
+   [OK] Reddit客户端ID: REDDIT_CLIENT_ID = ol_7ITEqBq9Znu25Tee2...
+   [OK] Reddit客户端密钥: REDDIT_CLIENT_SECRET = GSoDwcsWqhUY7HigxDjk...
+   [OK] YouTube API: YOUTUBE_API_KEY = AIzaSyAzdIFSo4R-gd3B...
+   [OK] Alpha Vantage: ALPHAVANTAGE_API_KEY = your_alphavantage_ke...
+
+无需API密钥的配置项:
+   [OK] HackerNews: HACKERNEWS_BASE_URL = https://hacker-news.firebaseio.com/v0
+   [OK] ArXiv: ARXIV_BASE_URL = http://export.arxiv.org/api/query
+   [OK] GDELT: GDELT_BASE_URL = https://api.gdeltproject.org/api/v2
+   [OK] RSS Feed: RSS_FEEDS = https://feeds.feedburner.com/techcrunch,https://hnrss.org/frontpage,https://www.reddit.com/r/MachineLearning/.rss
+
+[OK] 配置API定义测试通过
+
+=== 2. QueryEngine客户端测试 ===
+
+客户端类导入测试:
+   [OK] ComprehensiveSearchEngine: 类已定义
+   [OK] SemanticScholarSearch: 类已定义
+   [OK] RedditSearch: 类已定义
+   [OK] HackerNewsSearch: 类已定义
+   [OK] ArxivSearch: 类已定义
+
+引擎初始化测试:
+   [OK] ComprehensiveSearchEngine初始化成功
+   [OK] semantic_scholar 客户端已初始化
+   [OK] reddit 客户端已初始化
+   [OK] hackernews 客户端已初始化
+   [OK] arxiv 客户端已初始化
+   [OK] google 客户端已正确移除
+
+[OK] QueryEngine客户端测试通过
+
+=== 3. MediaEngine客户端测试 ===
+
+MediaEngine客户端类:
+   [OK] YouTubeDataClient: 类已定义
+   [OK] MultimodalContentEngine: 类已定义
+
+   [OK] MultimodalContentEngine初始化成功
+   [OK] YouTube客户端已初始化
+
+[OK] MediaEngine客户端测试通过
+
+=== 4. InsightEngine客户端测试 ===
+
+WeiboMultilingualSentimentAnalyzer 已创建，调用 initialize() 来加载模型
+InsightEngine客户端类:
+   [OK] AlphaVantageClient: 类已定义
+   [OK] GDELTClient: 类已定义
+   [OK] ComprehensiveInsightEngine: 类已定义
+
+   [OK] ComprehensiveInsightEngine初始化成功
+   [OK] Alpha Vantage客户端已初始化
+   [OK] GDELT客户端已初始化
+
+[OK] InsightEngine客户端测试通过
+
+=== 5. 前端配置集成测试 ===
+
+前端配置API字段:
+   [OK] TAVILY_API_KEY: 已配置
+   [OK] BOCHA_WEB_SEARCH_API_KEY: 已配置
+   [OK] SEMANTIC_SCHOLAR_API_KEY: 已配置
+   [OK] REDDIT_CLIENT_ID: 已配置
+   [OK] REDDIT_CLIENT_SECRET: 已配置
+   [OK] YOUTUBE_API_KEY: 已配置
+   [OK] ALPHAVANTAGE_API_KEY: 已配置
+   [OK] Google配置已正确移除
+
+后端CONFIG_KEYS:
+   [OK] TAVILY_API_KEY: 已配置
+   [OK] BOCHA_WEB_SEARCH_API_KEY: 已配置
+   [OK] SEMANTIC_SCHOLAR_API_KEY: 已配置
+   [OK] REDDIT_CLIENT_ID: 已配置
+   [OK] REDDIT_CLIENT_SECRET: 已配置
+   [OK] YOUTUBE_API_KEY: 已配置
+   [OK] ALPHAVANTAGE_API_KEY: 已配置
+
+   [OK] 前后端配置完全匹配 (7/7)
+
+[OK] 前端配置集成测试通过
+
+=== 6. 所有信息源汇总测试 ===
+
+QueryEngine搜索源:
+Traceback (most recent call last):
+  File "D:\Documents\codes\BettaFish\comprehensive_integration_test.py", line 347, in main
+    if test_func():
+       ^^^^^^^^^^^
+  File "D:\Documents\codes\BettaFish\comprehensive_integration_test.py", line 307, in test_all_information_sources
+    print(f"   \u2022 {name}: {desc}")
+UnicodeEncodeError: 'gbk' codec can't encode character '\u2022' in position 3: illegal multibyte sequence
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "D:\Documents\codes\BettaFish\comprehensive_integration_test.py", line 377, in <module>
+    success = main()
+              ^^^^^^
+  File "D:\Documents\codes\BettaFish\comprehensive_integration_test.py", line 352, in main
+    print(f"   \u274c {test_name} 测试失败: {e}")
+UnicodeEncodeError: 'gbk' codec can't encode character '\u274c' in position 3: illegal multibyte sequence

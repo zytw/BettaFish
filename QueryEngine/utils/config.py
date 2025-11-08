@@ -31,9 +31,18 @@ class Settings(BaseSettings):
     QUERY_ENGINE_MODEL_NAME: str = Field(..., description="Query Engine LLM模型名称")
     QUERY_ENGINE_PROVIDER: Optional[str] = Field(None, description="Query Engine LLM提供商（兼容字段）")
     
+    # ====================== 数据库配置 ======================
+    DB_HOST: Optional[str] = Field("bettafish-db", description="数据库主机，PostgreSQL容器服务名")
+    DB_USER: Optional[str] = Field("bettafish", description="数据库用户名")
+    DB_PASSWORD: Optional[str] = Field("bettafish", description="数据库密码")
+    DB_NAME: Optional[str] = Field("bettafish", description="数据库名称")
+    DB_PORT: int = Field(5432, description="数据库端口，PostgreSQL默认为5432")
+    DB_CHARSET: str = Field("", description="数据库字符集，PostgreSQL不需要此参数")
+    DB_DIALECT: Optional[str] = Field("postgresql", description="数据库方言，如mysql、postgresql等，SQLAlchemy后端选择")
+
     # ================== 网络工具配置 ====================
     TAVILY_API_KEY: str = Field(..., description="Tavily API（申请地址：https://www.tavily.com/）API密钥，用于Tavily网络搜索")
-    
+
     # ================== 搜索参数配置 ====================
     SEARCH_TIMEOUT: int = Field(240, description="搜索超时（秒）")
     SEARCH_CONTENT_MAX_LENGTH: int = Field(20000, description="用于提示的最长内容长度")

@@ -30,13 +30,15 @@ class Settings(BaseSettings):
     PORT: int = Field(5000, description="Flask服务器端口号，默认5000")
 
     # ====================== 数据库配置 ======================
-    DB_DIALECT: str = Field("mysql", description="数据库类型，例如 'mysql' 或 'postgresql'。用于支持多种数据库后端（如 SQLAlchemy，请与连接信息共同配置）")
-    DB_HOST: str = Field("your_db_host", description="数据库主机，例如localhost 或 127.0.0.1。我们也提供云数据库资源便捷配置，日均10w+数据，可免费申请，联系我们：670939375@qq.com NOTE：为进行数据合规性审查与服务升级，云数据库自2025年10月1日起暂停接收新的使用申请")
-    DB_PORT: int = Field(3306, description="数据库端口号，默认为3306")
-    DB_USER: str = Field("your_db_user", description="数据库用户名")
-    DB_PASSWORD: str = Field("your_db_password", description="数据库密码")
-    DB_NAME: str = Field("your_db_name", description="数据库名称")
-    DB_CHARSET: str = Field("utf8mb4", description="数据库字符集，推荐utf8mb4，兼容emoji")
+    # PostgreSQL作为默认数据库
+    DB_DIALECT: str = Field("postgresql", description="数据库类型，例如 'mysql' 或 'postgresql'。用于支持多种数据库后端（如 SQLAlchemy，请与连接信息共同配置）")
+    DB_HOST: str = Field("bettafish-db", description="数据库主机，PostgreSQL容器服务名或 localhost")
+    DB_PORT: int = Field(5432, description="数据库端口号，PostgreSQL默认为5432")
+    DB_USER: str = Field("bettafish", description="数据库用户名")
+    DB_PASSWORD: str = Field("bettafish", description="数据库密码")
+    DB_NAME: str = Field("bettafish", description="数据库名称")
+    # 注意：PostgreSQL不需要DB_CHARSET参数，此参数仅用于MySQL兼容性
+    DB_CHARSET: str = Field("", description="数据库字符集，PostgreSQL不需要此参数")
 
     # ======================= 文件输出配置 ======================
     OUTPUT_DIR: str = Field("/app/reports", description="报告和输出文件的保存目录")

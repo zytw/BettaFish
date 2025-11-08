@@ -1,6 +1,6 @@
 services:
   bettafish:
-    image: ghcr.io/666ghj/bettafish:latest
+    image: bettafish:latest
     # Speed up mirror
     # image: ghcr.nju.edu.cn/666ghj/bettafish:latest
     container_name: bettafish
